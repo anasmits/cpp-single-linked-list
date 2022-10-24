@@ -1,5 +1,3 @@
-#pragma once
-
 #include <cassert>
 #include <cstddef>
 #include <string>
@@ -182,13 +180,17 @@ public:
     }
     ~SingleLinkedList();
 
+    // Возвращает количество элементов в списке за время O(1)
     [[nodiscard]] size_t GetSize()const noexcept;
+    // Сообщает, пустой ли список за время O(1)
     [[nodiscard]] bool IsEmpty() const noexcept;
 
     void PushFront(const Type& value);
-    void PopFront() noexcept;
     void Clear() noexcept;
-    void swap(SingleLinkedList& other) noexcept;
+    void swap(SingleLinkedList& other) noexcept{
+        std::swap(head_.next_node, other.head_.next_node);
+        std::swap(size_, other.size_);
+    }
 
     [[nodiscard]] Iterator before_begin() noexcept {
         return Iterator(&head_);
@@ -213,28 +215,33 @@ public:
     * Если при создании элемента будет выброшено исключение, список останется в прежнем состоянии
     */
     Iterator InsertAfter(ConstIterator pos, const Type& value) {
-        if(pos.node_->next_node) {
-            auto node_ptr = new Node(value, pos.node_->next_node);
-            pos.node_->next_node = node_ptr;
-            ++this->size_;
-            return Iterator(node_ptr);
-        }
+        assert(pos != cend());
+        auto node_ptr = new Node(value, pos.node_->next_node);
+        pos.node_->next_node = node_ptr;
+        ++size_;
+        return Iterator (node_ptr);
     }
 
+    void PopFront() noexcept {
+        assert(!IsEmpty());
+        auto ptr = head_.next_node;
+        head_.next_node = head_.next_node->next_node;
+        delete ptr;
+        --size_;
+    }
 
     /*
      * Удаляет элемент, следующий за pos.
      * Возвращает итератор на элемент, следующий за удалённым
      */
     Iterator EraseAfter(ConstIterator pos) noexcept {
-        assert(size_ > 0);
-        if(pos.node_->next_node) {
-            Node *ptr = pos.node_->next_node;
-            pos.node_->next_node = pos.node_->next_node->next_node;
-            delete ptr;
-            --size_;
-            return Iterator(pos.node_->next_node);
-        }
+        assert(!IsEmpty());
+        assert(pos != cend());
+        Node* ptr = pos.node_->next_node;
+        pos.node_->next_node = pos.node_->next_node->next_node;
+        delete ptr;
+        --size_;
+        return Iterator(pos.node_->next_node);
     }
 
 };
@@ -249,21 +256,17 @@ SingleLinkedList<Type>::SingleLinkedList(std::initializer_list<Type> values){
 }
 
 template <typename Type>
-void SingleLinkedList<Type>::swap(SingleLinkedList<Type>& other) noexcept{
-    std::swap(*this, other);
-}
-
-template <typename Type>
 SingleLinkedList<Type>::SingleLinkedList(const SingleLinkedList<Type>& other) {
     // Сначала надо удостовериться, что текущий список пуст
     size_ = 0;
-    SingleLinkedList tmp1;
-    Node* tmp1_ptr = &tmp1.head_;
+    SingleLinkedList tmp;
+    Node* tmp_ptr = &tmp.head_;
     for(const auto &it : other){
-        tmp1_ptr->next_node = new Node(it, nullptr);
-        tmp1_ptr = tmp1_ptr->next_node;
+        tmp_ptr->next_node = new Node(it, nullptr);
+        tmp_ptr = tmp_ptr->next_node;
+        ++tmp.size_;
     }
-    tmp1.swap(*this);
+    tmp.swap(*this);
 }
 
 template <typename Type>
@@ -288,15 +291,6 @@ void SingleLinkedList<Type>::PushFront(const Type& value){
 }
 
 template<typename Type>
-void SingleLinkedList<Type>::PopFront() noexcept {
-    assert(size_ > 0);
-    auto ptr = head_.next_node;
-    head_.next_node = head_.next_node->next_node;
-    delete ptr;
-    --size_;
-}
-
-template<typename Type>
 void SingleLinkedList<Type>::Clear() noexcept {
     while(head_.next_node != nullptr){
         auto first = head_.next_node;
@@ -313,13 +307,8 @@ void swap(SingleLinkedList<Type>& lhs, SingleLinkedList<Type>& rhs) noexcept {
 
 template <typename Type>
 bool operator==(const SingleLinkedList<Type>& lhs, const SingleLinkedList<Type>& rhs) {
-    if(lhs.GetSize() != rhs.GetSize()) {
-        return false;
-    }
-    if(lhs.cbegin() == rhs.cbegin()){
-        return true;
-    }
-    return std::equal(lhs.cbegin(),lhs.cend(),rhs.cbegin(),rhs.cend());
+    return (&lhs == &rhs)
+            || ( lhs.GetSize() == rhs.GetSize() && std::equal(lhs.cbegin(),lhs.cend(),rhs.cbegin(),rhs.cend()) );
 }
 
 template <typename Type>
